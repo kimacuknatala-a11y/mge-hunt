@@ -1,0 +1,69 @@
+name: Build Android APK
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git python3-pip python3-dev \
+            ffmpeg libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev \
+            libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev \
+            libavcodec-dev zlib1g-dev libgstreamer1.0 \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+            openjdk-17-jdk autoconf automake libtool pkg-config \
+            ccache unzip wget libffi-dev
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install buildozer cython==0.29.33 virtualenv
+
+      - name: Create buildozer.spec
+        run: |
+          cat <<EOF > buildozer.spec
+          [app]
+          title = MGE Hunt
+          package.name = mgehun
+          package.domain = org.mge
+          source.dir = .
+          source.include_exts = py,png,jpg,kv,atlas,json,ogg,mp3,wav
+          version = 0.1
+          requirements = python3, kivy==2.2.1, pillow
+          orientation = landscape
+          fullscreen = 1
+          android.permissions = WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
+          android.api = 33
+          android.minapi = 21
+          android.ndk = 27c
+          android.archs = arm64-v8a
+          p4a.branch = master
+
+          [buildozer]
+          log_level = 2
+          warn_on_root = 1
+          EOF
+
+      - name: Build APK with Buildozer
+        run: |
+          # Используем один поток для стабильности
+          export P4A_JOBS=1
+          buildozer -v android debug
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: MGE-Hunt-APK
+          path: bin/*.apk
